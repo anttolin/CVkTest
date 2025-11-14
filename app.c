@@ -1,18 +1,17 @@
+#include "debug.h"
 #include "app.h"
 #include <stdlib.h>
 #include <string.h>
 
-static uint_fast8_t initWindow(app_t *app_p, int width, int height){
-    if(!glfwInit()) return 1;
+static GLFWwindow *getWindow(int width, int height){
+    if(!glfwInit()) return NULL;
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    app_p->window = glfwCreateWindow(width, height, "el titulo", NULL, NULL);
-    if(app_p->window) return 0;
-    else return 1;
+    GLFWwindow *window = glfwCreateWindow(width, height, "el titulo", NULL, NULL);
+    return window;
 }
 
-static uint_fast8_t initVk(app_t *app){
-    // CREATE INSTANCE
+static VkInstance *GetInstance(){
     VkApplicationInfo appInfo = (VkApplicationInfo){
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = "Hello Triangle",
@@ -25,43 +24,41 @@ static uint_fast8_t initVk(app_t *app){
     uint32_t glfwExtensionCount = 0;
     const char** glfwExtensions;
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
+    
+    const char **layerNames = NULL;
+    uint32_t count = 0;
+    #if DEBUG
+    const char *layer1 = "VK_LAYER_KHRONOS_validation";
+    #define LAYER_COUNT 1 // modify acording to the numbers of layers.
+    VkLayerProperties *prop;
+    vkEnumerateInstanceLayerProperties(&count, NULL);
+    vkEnumerateInstanceLayerProperties(&count, prop);
+    for (uint32_t i = 0; i < count; i++) {
+        if (!strcmp(prop[i].layerName, layer1)) {
+            *layerNames = layer1;
+            break;
+        }
+    }
+    count = LAYER_COUNT;
+    #endif
+    
     VkInstanceCreateInfo createInfo = (VkInstanceCreateInfo){
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo = &appInfo,
-
-        // VALIDATION LAYERS
-        #ifdef DEBUG
-            const char *layer1 = "VK_LAYER_KHRONOS_validation"
-            app->validationLayers = malloc(sizeof(void*) * 2);
-            app->validationLayers[0] = malloc(strlen(layer1) + 1);
-            strcpy(app->validationLayers[0], layer1);
-            app->validationLayers[1] = NULL;
-            ...
-        #else
-            .enabledLayerCount = 0,
-        #endif
+        .ppEnabledLayerNames = layerNames,
+        .enabledLayerCount = count,
         .enabledExtensionCount = glfwExtensionCount,
         .ppEnabledExtensionNames = glfwExtensions
     };
-
-    if (vkCreateInstance(&createInfo, NULL, &app->instance)) return 1;
-
-    return 0;
+    VkInstance *instance;
+    vkCreateInstance(&createInfo, NULL, instance);
+    return instance;
 }
 
 app_t *app_init(int window_width, int window_height){
     app_t *app = malloc(sizeof(app_t));
     if(initWindow(app, window_width, window_height)) return NULL; // error: couldnt init window
     if(initVk(app)) return NULL; // error: couldnt init Vulkan.
-
-    // Validation Layers
-    const char *layer1 = "VK_LAYER_KHRONOS_validation";
-    app->validationLayers = malloc(sizeof(void*) * 2);
-    app->validationLayers[0] = malloc(strlen(layer1) + 1);
-    strcpy(app->validationLayers[0], layer1);
-    app->validationLayers[1] = NULL;
-    
     return app;
 }
 
@@ -76,7 +73,5 @@ void app_free(app_t *app){
     vkDestroyInstance(app->instance, NULL);
     glfwDestroyWindow(app->window);
     glfwTerminate();
-    for (uint_fast8_t i = 0; app->validationLayers[i]; i++) free(app->validationLayers[i]);
-    free(app->validationLayers);
     free(app);
 }

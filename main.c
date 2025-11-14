@@ -10,8 +10,8 @@
 int main() {
     app_t *app = app_init(SCREEN_WIDTH, SCREEN_HEIGHT);
     if (!app) return 1;
-    app_run(app);
-    app_free(app);
+    app_runxxx;
+    app_free;
     
     return 0;
 }
